@@ -1,6 +1,10 @@
 package com.example.bouda04.testlogindrive;
 
+import android.Manifest;
+import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
@@ -54,11 +58,16 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
+import pub.devrel.easypermissions.AfterPermissionGranted;
+import pub.devrel.easypermissions.EasyPermissions;
 
-public class MainActivity extends Activity implements View.OnClickListener {
+
+public class MainActivity extends Activity implements View.OnClickListener, MediaPlayer.OnPreparedListener  {
     private final int RC_SIGN_IN = 1;
     private final String TAG = "MainActivity";
     static final int REQUEST_AUTHORIZATION = 1001;
+    static final int REQUEST_ACCOUNT_PICKER = 1000;
+    static final int REQUEST_PERMISSION_GET_ACCOUNTS = 1003;
     GoogleSignInClient mGoogleSignInClient;
     DriveClient mDriveClient;
     DriveResourceClient mDriveResourceClient;
@@ -133,9 +142,12 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 this, Arrays.asList(SCOPES))
                 .setBackOff(new ExponentialBackOff());
 
-
+        Account c = account.getAccount();
         mCredential.setSelectedAccount(account.getAccount());
-        new MakeRequestTask(mCredential).execute();
+        if (mCredential.getSelectedAccountName() == null)
+            chooseAccount();
+        else
+            new MakeRequestTask(mCredential).execute();
     }
     @Override
     public void onClick(View view) {
@@ -154,14 +166,47 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
                 handleSignInResult(task);
                 break;
+            case REQUEST_ACCOUNT_PICKER:
+                if (resultCode == RESULT_OK && data != null &&
+                        data.getExtras() != null) {
+                    String accountName =
+                            data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
+                    if (accountName != null) {
+
+                        mCredential.setSelectedAccountName(accountName);
+                        new MakeRequestTask(mCredential).execute();
+                    }
+                }
+                break;
             case REQUEST_AUTHORIZATION:
                 if (resultCode == RESULT_OK) {
-                    new MakeRequestTask(mCredential).execute();
+                    if (mCredential.getSelectedAccountName() == null)
+                        chooseAccount();
+                    else
+                        new MakeRequestTask(mCredential).execute();
                 }
                 break;
         }
 
     }
+        @AfterPermissionGranted(REQUEST_PERMISSION_GET_ACCOUNTS)
+        private void chooseAccount() {
+            if (EasyPermissions.hasPermissions(
+                    this, Manifest.permission.GET_ACCOUNTS)) {
+                    // Start a dialog from which the user can choose an account
+                    startActivityForResult(
+                            mCredential.newChooseAccountIntent(),
+                            REQUEST_ACCOUNT_PICKER);
+            } else {
+                // Request the GET_ACCOUNTS permission via a user dialog
+                EasyPermissions.requestPermissions(
+                        this,
+                        "This app needs to access your Google account (via Contacts).",
+                        REQUEST_PERMISSION_GET_ACCOUNTS,
+                        Manifest.permission.GET_ACCOUNTS);
+            }
+        }
+
 
     private void handleSignInResult(Task<GoogleSignInAccount> completedTask) {
         try {
@@ -175,6 +220,11 @@ public class MainActivity extends Activity implements View.OnClickListener {
             Log.w(TAG, "handleSignInResult:signInResult:failed code=" + e.getStatusCode());
             //updateUI(null);
         }
+    }
+
+    @Override
+    public void onPrepared(MediaPlayer mediaPlayer) {
+        mediaPlayer.start();
     }
 
 
@@ -229,6 +279,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
             if (files != null) {
                 for (File file : files) {
                     String downloadUrl = file.getDownloadUrl();
+
                     String url2 = file.getDefaultOpenWithLink();
                     fileInfo.add(String.format("%s, %s, %s (%s)\n",
                             file.getEmbedLink(), file.getWebViewLink(), file.getWebContentLink(),file.getId()));
@@ -242,7 +293,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
                     .executeMediaAndDownloadTo(fos);
             fos.close();
 
-            playFile(Uri.parse(testFile.getAbsolutePath()));
+       //    playFile(testFile.getAbsolutePath());
+            playFile("https://drive.google.com/uc?export=download&id=" + files.get(0).getId());
             return fileInfo;
         }
 
@@ -280,18 +332,23 @@ public class MainActivity extends Activity implements View.OnClickListener {
         }
     }
 
-    private void playFile(Uri uri){
+    private void playFile(String path){
+        Uri uri  = Uri.parse(path);
         MediaPlayer mPlayer = new MediaPlayer();
         mPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
         try {
  //           String str = "https://drive.google.com/uc?id=1_uEMXQiJn6O54Qon82-6qdV4xmH0Pkot";
  //           String str2 = "https://doc-0c-2g-docs.googleusercontent.com/docs/securesc/g3991q79q9scnr4elrnc8247moeij6np/o3jme3ir8k55ai5ep5dnbo2qp3lg615v/1519898400000/11907581883552072574/11907581883552072574/1_uEMXQiJn6O54Qon82-6qdV4xmH0Pkot";
  //           uri = Uri.parse(str2);
-            mPlayer.setDataSource(getApplicationContext(), uri);
+            String s = "https://doc-0c-2g-docs.googleusercontent.com/docs/securesc/g3991q79q9scnr4elrnc8247moeij6np/a6g4nq603nvh5s1s8jbkqv22aq5gc6lf/1520964000000/11907581883552072574/11907581883552072574/1_uEMXQiJn6O54Qon82-6qdV4xmH0Pkot";
 
-            mPlayer.prepare();
-            mPlayer.start();
-        } catch (IOException e) {
+        //    mPlayer.setDataSource(getApplicationContext(), uri);
+            mPlayer.setDataSource(path);
+            mPlayer.setOnPreparedListener(this);
+            mPlayer.prepareAsync(); // prepare async to not block main thread
+          //  mPlayer.prepare();
+          // mPlayer.start();
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
