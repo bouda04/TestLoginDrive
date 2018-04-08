@@ -6,7 +6,9 @@ import android.accounts.AccountManager;
 import android.app.ListFragment;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
@@ -136,24 +138,35 @@ public class DriveItems extends ItemsFrag {
             new CollectFiles(mCredential).execute();
     }
 
-    @AfterPermissionGranted(REQUEST_PERMISSION_GET_ACCOUNTS)
+   // @AfterPermissionGranted(REQUEST_PERMISSION_GET_ACCOUNTS)
     private void chooseAccount() {
-        if (EasyPermissions.hasPermissions(
-                getActivity(), Manifest.permission.GET_ACCOUNTS)) {
-            // Start a dialog from which the user can choose an account
-            startActivityForResult(
-                    mCredential.newChooseAccountIntent(),
-                    REQUEST_ACCOUNT_PICKER);
-        } else {
-            // Request the GET_ACCOUNTS permission via a user dialog
+        if (Build.VERSION.SDK_INT >= 23){
+            if (getContext().checkSelfPermission(Manifest.permission.GET_ACCOUNTS)!= PackageManager.PERMISSION_GRANTED){
+                //   if (EasyPermissions.hasPermissions(
+                //            getActivity(), Manifest.permission.GET_ACCOUNTS)) {
+                // Start a dialog from which the user can choose an account
+                startActivityForResult(
+                        mCredential.newChooseAccountIntent(),
+                        REQUEST_ACCOUNT_PICKER);
+            } else {
+                // Request the GET_ACCOUNTS permission via a user dialog
+                requestPermissions(new String[]{Manifest.permission.GET_ACCOUNTS}, REQUEST_PERMISSION_GET_ACCOUNTS);
+            /*
             EasyPermissions.requestPermissions(
                     this,
                     "This app needs to access your Google account (via Contacts).",
                     REQUEST_PERMISSION_GET_ACCOUNTS,
-                    Manifest.permission.GET_ACCOUNTS);
+                    Manifest.permission.GET_ACCOUNTS);*/
+            }
         }
+
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        chooseAccount();
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    }
 
     private class CollectFiles extends AsyncTask<Void, Void, List<MyFile>> {
         private com.google.api.services.drive.Drive mDrive = null;
