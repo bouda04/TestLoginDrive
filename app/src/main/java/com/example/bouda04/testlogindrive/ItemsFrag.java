@@ -1,7 +1,9 @@
 package com.example.bouda04.testlogindrive;
 
+import android.app.Activity;
 import android.app.ListFragment;
 import android.content.Context;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.view.View;
@@ -22,6 +24,21 @@ public abstract class ItemsFrag extends ListFragment {
         this.context = context;
         initFrag();
         super.onAttach(context);
+    }
+
+    /*
+ * Deprecated on API 23
+
+ */
+    @SuppressWarnings("deprecation")
+    @Override public void onAttach(Activity activity) {
+        super.onAttach(activity);
+        if (Build.VERSION.SDK_INT < 23) {
+            this.listener = (ItemsListener) activity;
+            this.context = activity;
+            initFrag();
+            super.onAttach(activity);
+        }
     }
 
     @Override
